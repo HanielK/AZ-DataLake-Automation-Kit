@@ -1,0 +1,370 @@
+name: "PS_DW DEPLOY DATABRICKS ASSET BUNDLE"
+
+on:
+  workflow_dispatch:
+    inputs:
+      TargetDeploymentEnvironment:
+        description: 'Choose the deployment environment'
+        required: true
+        default: DV
+        type: choice
+        options:
+          - DV
+          - UA
+          - PR
+      CreateWorkspaceObjects:
+        description: 'Create Databricks workspace objects'
+        required: true
+        default: false
+        type: boolean
+      DestroyBundleFirst:
+        description: 'Destroy the bundle before deploying'
+        required: true
+        default: false
+        type: boolean
+
+jobs:
+  set_lowercase_env:
+    name: "Set lowercase environment variable"
+    runs-on: ps-dw-github-action-hosted-runner-databricks
+    outputs:
+      lowercase_env: ${{ steps.set_env.outputs.lowercase_env }}
+    steps:
+      - id: set_env
+        run: echo "lowercase_env=${{ inputs.TargetDeploymentEnvironment }}" | tr '[:upper:]' '[:lower:]' >> $GITHUB_OUTPUT
+
+  get_subscription:
+    name: "Get subscription ID"
+    runs-on: ps-dw-github-action-hosted-runner-databricks
+    environment: ${{ inputs.TargetDeploymentEnvironment }}
+    needs: set_lowercase_env
+    if: ${{ inputs.CreateWorkspaceObjects }}
+    outputs:
+      subscription_id: ${{ steps.get_subscription_id.outputs.subscription_id }}
+
+    steps:
+      - uses: actions/checkout@v1
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets[format('PS_DW_{0}_AZ_CONN', inputs.TargetDeploymentEnvironment)] }}
+      - id: get_subscription_id
+        run: |
+          SUBSCRIPTION_ID=$(az account show --query id --output tsv)
+          echo "subscription_id=$SUBSCRIPTION_ID" >> $GITHUB_OUTPUT
+
+  get_metastore_id:
+    name: "Get metastore ID"
+    runs-on: ps-dw-github-action-hosted-runner-databricks
+    if: ${{ inputs.CreateWorkspaceObjects }}
+    env:
+      DATABRICKS_HOST: ${{ vars[format('DBX_{0}_HOST', inputs.TargetDeploymentEnvironment)] }}
+      ARM_TENANT_ID: ${{ vars.AZ_TENANT_ID }}
+      ARM_CLIENT_ID: ${{ vars[format('PS_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
+      ARM_CLIENT_SECRET: ${{ secrets[format('PS_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
+    outputs:
+      metastore_id: ${{ steps.get_metastore.outputs.metastore_id }}
+    steps:
+      - uses: actions/checkout@v1
+      - uses: databricks/setup-cli@v0.234.0
+      - id: get_metastore
+        run: |
+          METASTORE_ID=$(databricks metastores list | grep metastore_azure_eastus | awk '{print $1}')
+          echo "metastore_id=$METASTORE_ID" >> $GITHUB_OUTPUT
+
+  update_metastore_grants:
+    name: "Update metastore permissions"
+    runs-on: ps-dw-github-action-hosted-runner-databricks
+    needs: get_metastore_id
+    if: ${{ inputs.CreateWorkspaceObjects }}
+    env:
+      DATABRICKS_HOST: ${{ vars[format('DBX_{0}_HOST', inputs.TargetDeploymentEnvironment)] }}
+      ARM_TENANT_ID: ${{ vars.AZ_TENANT_ID }}
+      ARM_CLIENT_ID: ${{ vars[format('PS_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
+      ARM_CLIENT_SECRET: ${{ secrets[format('PS_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
+      PRINCIPAL: ${{ vars[format('PS_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
+    steps:
+      - uses: actions/checkout@v1
+      - uses: databricks/setup-cli@v0.234.0
+      - run: |
+          databricks grants update METASTORE ${{ needs.get_metastore_id.outputs.metastore_id }} --json '{
+            "changes": [
+              {
+                "principal": "${{ env.PRINCIPAL }}",
+                "add": [
+                  "CREATE EXTERNAL LOCATION",
+                  "CREATE CATALOG"                  
+                ]
+              }
+            ]
+          }'
+
+  create_storage_credential:
+    name: "Create storage credential"
+    runs-on: ps-dw-github-action-hosted-runner-databricks
+    environment: ${{ inputs.TargetDeploymentEnvironment }}
+    needs:
+      - set_lowercase_env
+      - get_subscription
+    if: ${{ inputs.CreateWorkspaceObjects }}
+    env:
+      DATABRICKS_HOST: ${{ vars[format('DBX_{0}_HOST', inputs.TargetDeploymentEnvironment)] }}
+      ARM_TENANT_ID: ${{ vars.AZ_TENANT_ID }}
+      ARM_CLIENT_ID: ${{ vars[format('PS_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
+      ARM_CLIENT_SECRET: ${{ secrets[format('PS_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
+      STORAGE_CREDENTIAL: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-cred-dbx
+      SUBSCRIPTION_ID: ${{ needs.get_subscription.outputs.subscription_id }}
+      RESOURCE_GROUP: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-rg
+      ACCESS_CONNECTOR: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-ac-dbx
+      WORKSPACE_ID: ${{ vars[format('DBX_{0}_WORKSPACE_ID', inputs.TargetDeploymentEnvironment)] }}
+      DATABRICKS_ADMIN_GROUP: "ACL-PS-PSDW-DATABRICKSADMIN"
+    steps:
+      - uses: actions/checkout@v1
+      - uses: databricks/setup-cli@v0.234.0
+
+      - run: |
+          if ! databricks storage-credentials get ${{ env.STORAGE_CREDENTIAL }}; then
+            databricks storage-credentials create --json '{
+                "name": "${{ env.STORAGE_CREDENTIAL }}",
+                "azure_managed_identity": {
+                    "access_connector_id": "/subscriptions/${{ env.SUBSCRIPTION_ID }}/resourceGroups/${{ env.RESOURCE_GROUP }}/providers/Microsoft.Databricks/accessConnectors/${{ env.ACCESS_CONNECTOR }}"       
+                }
+            }'
+
+            databricks storage-credentials update ${{ env.STORAGE_CREDENTIAL }} --isolation-mode ISOLATION_MODE_ISOLATED
+
+            databricks workspace-bindings update-bindings storage-credential ${{ env.STORAGE_CREDENTIAL }} --json '{
+              "add": [{"workspace_id": ${{ env.WORKSPACE_ID }}, "binding_type": "BINDING_TYPE_READ_WRITE"}]
+            }'
+
+            databricks grants update CREDENTIAL ${{ env.STORAGE_CREDENTIAL }} --json '{
+              "changes": [
+                {
+                  "principal": "${{ env.ARM_CLIENT_ID }}",
+                  "add": [
+                    "ALL PRIVILEGES"
+                  ]
+                }
+              ]
+            }'
+
+            databricks storage-credentials update ${{ env.STORAGE_CREDENTIAL }} --json '{
+                "owner": "${{ env.DATABRICKS_ADMIN_GROUP }}",
+                "comment": "Storage Credential for the ${{ inputs.TargetDeploymentEnvironment }} environment of Great Lakes."
+            }'
+          else
+            echo "Storage credential ${{ env.STORAGE_CREDENTIAL }} already exists."
+          fi                    
+
+  create_external_location:
+    name: "Create external locations"
+    runs-on: ps-dw-github-action-hosted-runner-databricks
+    environment: ${{ inputs.TargetDeploymentEnvironment }}
+    needs:
+      - set_lowercase_env
+      - create_storage_credential
+      - update_metastore_grants
+    if: ${{ inputs.CreateWorkspaceObjects }}
+    env:
+      DATABRICKS_HOST: ${{ vars[format('DBX_{0}_HOST', inputs.TargetDeploymentEnvironment)] }}
+      ARM_TENANT_ID: ${{ vars.AZ_TENANT_ID }}
+      ARM_CLIENT_ID: ${{ vars[format('PS_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
+      ARM_CLIENT_SECRET: ${{ secrets[format('PS_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
+      STORAGE_CREDENTIAL: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-cred-dbx
+      WORKSPACE_ID: ${{ vars[format('DBX_{0}_WORKSPACE_ID', inputs.TargetDeploymentEnvironment)] }}
+      STORAGE_NAME_BASE: psdw${{ needs.set_lowercase_env.outputs.lowercase_env }}stor
+      DATABRICKS_ADMIN_GROUP: "ACL-PS-PSDW-DATABRICKSADMIN"
+    steps:
+      - uses: actions/checkout@v1
+      - uses: databricks/setup-cli@v0.234.0
+      - run: |
+          declare -A locations
+          locations[${{ env.STORAGE_NAME_BASE }}dataraw]="abfss://raw@${{ env.STORAGE_NAME_BASE }}data.dfs.core.windows.net/"
+          locations[${{ env.STORAGE_NAME_BASE }}datalanding]="abfss://landing@${{ env.STORAGE_NAME_BASE }}data.dfs.core.windows.net/"
+          locations[${{ env.STORAGE_NAME_BASE }}datacurated]="abfss://curated@${{ env.STORAGE_NAME_BASE }}data.dfs.core.windows.net/"
+          locations[${{ env.STORAGE_NAME_BASE }}dataaggregated]="abfss://aggregated@${{ env.STORAGE_NAME_BASE }}data.dfs.core.windows.net/"
+          locations[${{ env.STORAGE_NAME_BASE }}meta]="abfss://managed@${{ env.STORAGE_NAME_BASE }}meta.dfs.core.windows.net/"
+
+          for location in "${!locations[@]}"; do
+            if ! databricks external-locations get $location; then
+              # Create external location
+              databricks external-locations create $location ${locations[$location]} ${{ env.STORAGE_CREDENTIAL }}
+            
+              # Set the isolation mode to ISOLATED
+              databricks external-locations update $location --isolation-mode ISOLATION_MODE_ISOLATED
+            
+              # Assign the external location to the specific workspace
+              databricks workspace-bindings update-bindings external-location $location --json '{
+                "add": [{"workspace_id": ${{ env.WORKSPACE_ID }}, "binding_type": "BINDING_TYPE_READ_WRITE" }]
+              }'
+
+              # Grant permissions
+              databricks grants update external-location $location --json '{
+                "changes": [
+                  {
+                    "principal": "${{ env.ARM_CLIENT_ID }}",
+                    "add": [
+                      "ALL PRIVILEGES"
+                    ]
+                  }
+                ]
+              }'
+
+              # Update the external location owner
+              databricks external-locations update $location --json '{
+                  "owner": "${{ env.DATABRICKS_ADMIN_GROUP }}"
+              }'
+            else
+              echo "External location $location already exists."
+            fi
+          done
+
+  create_catalog:
+    name: "Create catalog"
+    runs-on: ps-dw-github-action-hosted-runner-databricks
+    environment: ${{ inputs.TargetDeploymentEnvironment }}
+    needs:
+      - set_lowercase_env
+      - create_external_location
+    if: ${{ inputs.CreateWorkspaceObjects }}
+    env:
+      DATABRICKS_HOST: ${{ vars[format('DBX_{0}_HOST', inputs.TargetDeploymentEnvironment)] }}
+      ARM_TENANT_ID: ${{ vars.AZ_TENANT_ID }}
+      ARM_CLIENT_ID: ${{ vars[format('PS_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
+      ARM_CLIENT_SECRET: ${{ secrets[format('PS_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
+      WORKSPACE_ID: ${{ vars[format('DBX_{0}_WORKSPACE_ID', inputs.TargetDeploymentEnvironment)] }}
+      STORAGE_BASE_NAME: psdw${{ needs.set_lowercase_env.outputs.lowercase_env }}stor
+      DATABRICKS_DEVELOPER_GROUP: "ACL-PS-PSDW-DEV"
+      DATABRICKS_ADMIN_GROUP: "ACL-PS-PSDW-DATABRICKSADMIN"
+    steps:
+      - uses: actions/checkout@v1
+      - uses: databricks/setup-cli@v0.234.0
+      - run: |
+          # Get catalog name
+          if [ "${{ needs.set_lowercase_env.outputs.lowercase_env }}" == "pr" ]; then
+            CATALOG_NAME="datawarehouse"
+          else
+            CATALOG_NAME="datawarehouse_${{ needs.set_lowercase_env.outputs.lowercase_env }}"
+          fi
+
+          # Create the catalog if not exists
+          if ! databricks catalogs get $CATALOG_NAME; then
+            databricks catalogs create --json '{
+                "name": "'$CATALOG_NAME'",
+                "storage_root": "abfss://managed@${{ env.STORAGE_BASE_NAME }}meta.dfs.core.windows.net/"
+            }'
+            
+            # Set the catalog's isolation mode to ISOLATED
+            databricks catalogs update $CATALOG_NAME --isolation-mode ISOLATED
+            
+            # Assign the catalog to the specific workspace
+            databricks workspace-bindings update-bindings catalog $CATALOG_NAME --json '{
+              "add": [{"workspace_id": ${{ env.WORKSPACE_ID }}, "binding_type": "BINDING_TYPE_READ_WRITE"}]
+            }'
+
+            # Grant permissions to service principal
+            databricks grants update catalog $CATALOG_NAME --json '{
+              "changes": [
+                {
+                  "principal": "${{ env.ARM_CLIENT_ID }}",
+                  "add": [
+                    "ALL PRIVILEGES"
+                  ]
+                }
+              ]
+            }'
+            
+            # Grant permissions to developer group
+            if [ "${{ needs.set_lowercase_env.outputs.lowercase_env }}" == "dv" ]; then
+              databricks grants update catalog $CATALOG_NAME --json '{
+                "changes": [
+                  {
+                    "principal": "${{ env.DATABRICKS_DEVELOPER_GROUP }}",
+                    "add": [
+                      "USE CATALOG",
+                      "USE SCHEMA",
+                      "SELECT"
+                    ]
+                  }
+                ]
+              }'
+            fi
+
+            # Change ownership
+            databricks catalogs update $CATALOG_NAME --json '{
+                "owner": "${{ env.DATABRICKS_ADMIN_GROUP }}"
+            }'
+          else
+            echo "Catalog $CATALOG_NAME already exists."
+          fi
+
+  create_schemas:
+    name: "Create schemas"
+    runs-on: ps-dw-github-action-hosted-runner-databricks
+    environment: ${{ inputs.TargetDeploymentEnvironment }}
+    needs:
+      - set_lowercase_env
+      - create_catalog
+    if: ${{ inputs.CreateWorkspaceObjects }}
+    env:
+      DATABRICKS_HOST: ${{ vars[format('DBX_{0}_HOST', inputs.TargetDeploymentEnvironment)] }}
+      ARM_TENANT_ID: ${{ vars.AZ_TENANT_ID }}
+      ARM_CLIENT_ID: ${{ vars[format('PS_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
+      ARM_CLIENT_SECRET: ${{ secrets[format('PS_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
+      STORAGE_BASE_NAME: psdw${{ needs.set_lowercase_env.outputs.lowercase_env }}stor
+      DATABRICKS_ADMIN_GROUP: "ACL-PS-PSDW-DATABRICKSADMIN"
+    steps:
+      - uses: actions/checkout@v1
+      - uses: databricks/setup-cli@v0.234.0
+      - run: |
+          # Get catalog name
+          if [ "${{ needs.set_lowercase_env.outputs.lowercase_env }}" == "pr" ]; then
+            CATALOG_NAME="datawarehouse"
+          else
+            CATALOG_NAME="datawarehouse_${{ needs.set_lowercase_env.outputs.lowercase_env }}"
+          fi
+
+          # Define schemas
+          declare -A schema_dict
+          schema_dict[landing_sf]="abfss://managed@${{ env.STORAGE_BASE_NAME }}meta.dfs.core.windows.net"
+          schema_dict[raw_ifs]="abfss://raw@${{ env.STORAGE_BASE_NAME }}data.dfs.core.windows.net/ifs"
+          schema_dict[raw_pc]="abfss://raw@${{ env.STORAGE_BASE_NAME }}data.dfs.core.windows.net/pc"
+          schema_dict[raw_sf]="abfss://raw@${{ env.STORAGE_BASE_NAME }}data.dfs.core.windows.net/sf"
+          schema_dict[curated_dw]="abfss://curated@${{ env.STORAGE_BASE_NAME }}data.dfs.core.windows.net/dw"
+
+          for schema in "${!schema_dict[@]}"; do
+            if ! databricks schemas get $CATALOG_NAME.$schema; then
+              # Create schema
+              databricks schemas create $schema $CATALOG_NAME --storage-root ${schema_dict[$schema]}
+            
+              # Change ownership
+              databricks schemas update $CATALOG_NAME.$schema --json '{
+                  "owner": "${{ env.DATABRICKS_ADMIN_GROUP }}"
+              }'            
+              else
+              echo "Schema $schema already exists."
+            fi
+          done
+
+  deploy_etl:
+    name: "Deploy ETL Databricks asset bundle"
+    runs-on: ps-dw-github-action-hosted-runner-databricks
+    environment: ${{ inputs.TargetDeploymentEnvironment }}
+    needs:
+      - set_lowercase_env
+      - create_schemas
+    if: always()
+    env:
+      DATABRICKS_HOST: ${{ vars[format('DBX_{0}_HOST', inputs.TargetDeploymentEnvironment)] }}
+      ARM_TENANT_ID: ${{ vars.AZ_TENANT_ID }}
+      ARM_CLIENT_ID: ${{ vars[format('PS_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
+      ARM_CLIENT_SECRET: ${{ secrets[format('PS_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
+      DATABRICKS_BUNDLE_ENV: ${{ needs.set_lowercase_env.outputs.lowercase_env }}
+      GIT_BRANCH_NAME: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v1
+      - uses: databricks/setup-cli@v0.234.0
+      - if: ${{ inputs.DestroyBundleFirst }}
+        run: databricks bundle destroy --auto-approve
+        working-directory: ./databricks/etl/
+      - run: databricks bundle deploy --var="git_branch=${{ env.GIT_BRANCH_NAME }}"
+        working-directory: ./databricks/etl/
