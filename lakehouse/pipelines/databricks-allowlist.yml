@@ -1,0 +1,44 @@
+
+#manual trigger
+trigger:
+  branches:
+    exclude:
+      - '*'
+#Agent Pool 
+pool:
+  name: Build
+
+parameters:
+  - name: ENVIRONMENT
+    type: string
+    default: 'dv'
+
+  - name: DATABRICKS_WORKSPACE
+    type: string
+    default: 'https://<yourdatabricksinstanceid>.azuredatabricks.net'
+
+  - name: Enable_Power_BI
+    type: string
+    default: 1
+  
+  - name: NATGATEWAY_PUBLICIP
+    type: string
+    default: ''
+
+variables:
+   - template: variables.${{ parameters.ENVIRONMENT }}.yml
+
+stages:
+  - stage: IPAllowlist
+    displayName: 'IP Allowlist for Databricks'
+    jobs:
+    - job: AllowllistIP
+      steps:
+      - task: AzureCLI@2
+        inputs:
+          azureSubscription: ${{ variables.azureServiceConnection }}
+          scriptType: 'ps'
+          scriptLocation: 'scriptPath'
+          scriptPath: '$(System.DefaultWorkingDirectory)/pipelines/scripts/databricks/databricks_enable_ips.ps1'
+          arguments: '-Environment ${{  parameters.ENVIRONMENT }} -DatabricksWorkspace ${{ parameters.DATABRICKS_WORKSPACE }} -EnablePowerBI ${{ parameters.Enable_Power_BI }} -NATPublicIP ${{ parameters.NATGATEWAY_PUBLICIP }}'
+          

@@ -1,0 +1,41 @@
+#manual trigger
+trigger:
+  branches:
+    exclude:
+      - '*'
+variables:
+  - template: variables.sb.yml
+
+
+pool:
+  name: Build
+
+parameters:
+  - name: DATABRICKS_HOST
+    type: string
+    default: 'https://<yourdatabricksinstanceid>.azuredatabricks.net'
+
+  - name: DATABRICKS_CLUSTER_CONFIG_FILE
+    type: string
+    default: 'environments/dv/databricks-compute/cluster-config.json'
+
+  - name: AZURE_SERVICE_CONNECTION
+    type: string
+    default: 'sc-todo-sb-svcpri-dev'
+
+#deploy databricks compute cluster
+
+stages:
+  - stage: DeployDatabricksCompute
+    displayName: 'Deploy Databricks Compute'
+    jobs:
+    - job: DeployDatabricksCompute
+      displayName: 'Deploy Databricks Compute'
+      steps:
+      - task: AzureCLI@2
+        inputs:
+          azureSubscription: ${{ parameters.AZURE_SERVICE_CONNECTION }}
+          scriptType: 'ps'
+          scriptLocation: 'scriptPath'
+          scriptPath: '$(System.DefaultWorkingDirectory)/pipelines/scripts/databricks/databricks_deploy_compute.ps1'
+          arguments: -DatabricksHost ${{ parameters.DATABRICKS_HOST }} -ClusterConfigPath ${{ parameters.DATABRICKS_CLUSTER_CONFIG_FILE }} 

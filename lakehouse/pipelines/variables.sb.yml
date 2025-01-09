@@ -1,0 +1,13 @@
+variables:
+#------------------------------------------------------------------
+# Infra Pipeline Configuration
+#------------------------------------------------------------------
+
+#Agent Pool Name  
+  - name: agentPool
+    value: BuildWSL
+  
+#Azure Service Connection Name
+  - name: azureServiceConnection
+    #value: sc-unitycatalog-pr-svcpri-adm
+    value: sc-todo-sb-svcpri-dev

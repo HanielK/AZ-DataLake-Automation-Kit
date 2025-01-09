@@ -1,0 +1,64 @@
+# **************************************************************************
+#  Notes... deploy resources accodrding to the following sequence
+# **************************************************************************
+# =-> Deploy Log Analytics Workspace
+# =-> Deploy Nat Gateway
+# =-> Deploy Virtual Network
+# =-> Deploy Data Storage Account
+# =-> Deploy Meta Storage Account
+# =-> Deploy Key Vault
+# =-> Deploy Event Hub Namepsace
+# =-> Deploy Data Factory
+# =-> Deploy Databricks Workspace
+# =-> Deploy DataBricks Access Connector
+# ---------------------------------------------------------------------------
+
+name: CI Pipeline Test Deployment
+
+# Define the events that trigger the workflow
+# on:
+#   # Set your workflow to run on push events to the develop and all feature branches
+#   push:
+#     branches:
+#       - develop
+#       - feature/*
+#   # Set your workflow to run on pull request events that target the main branch
+#   pull_request:
+#     branches: 
+#       - main
+on:
+  workflow_dispatch:
+    
+
+jobs:
+  deploy-bicep:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v1
+
+      - name: Azure Login action
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          enable-AzPSSession: true
+
+      - name: Combine Parameter Files
+        run: |
+          jq -s '.[0] * .[1]' ./environments/sb/_parameters.log_analytics_workspace.json ./environments/sb/_parameters.sb.json > combined_parameters.json
+
+      - name: Deploy BICEP Log Analytics Workspace
+        uses: azure/arm-deploy@v1
+        with:
+          scope: resourcegroup
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }} # Subscription ID
+          resourceGroupName: 'ps-dw-sb-rg'
+          template: './modules/log_analytics_solution/main.bicep' # Path to your Bicep template
+          parameters: combined_parameters.json
+          deploymentName: 'bicep-deployment' # Name of the deployment
+
+      # Verify deployment
+      - name: Verify Deployment
+        run: |
+          az deployment group show --name bicep-deployment --resource-group ps-dw-dv-rg --query properties.outputs --output table

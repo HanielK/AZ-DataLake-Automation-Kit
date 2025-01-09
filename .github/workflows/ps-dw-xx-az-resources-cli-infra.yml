@@ -1,0 +1,183 @@
+# **************************************************************************
+#  Notes... deploy resources accodrding to the following sequence
+# **************************************************************************
+# =-> Deploy Log Analytics Workspace
+# =-> Deploy Nat Gateway
+# =-> Deploy Virtual Network
+# =-> Deploy Data Storage Account
+# =-> Deploy Meta Storage Account
+# =-> Deploy Key Vault
+# =-> Deploy Event Hub Namepsace
+# =-> Deploy Data Factory
+# =-> Deploy Databricks Workspace - Seperarate Workflow
+# =-> Deploy DataBricks Access Connector - Seperarate Workflow
+# ---------------------------------------------------------------------------
+
+#   # This YAML is environment agnostic(can deploy to any of the following chosen environments DEV/ UA/ PR)
+# ----------------------------------------------------------------------------------------------------------------
+
+name: PS_DW DEPLOY INFRASTRUCTURE
+
+concurrency: 1
+
+on:
+  workflow_dispatch:
+    inputs:
+      TargetDeploymentEnvironment:
+        description: 'Choose the deployment environment'
+        required: true
+        default: DV
+        type: choice
+        options:
+          - DV
+          - UA
+          - PR
+
+jobs:
+  set_lowercase_env:
+    name: "Set lowercase environment variable"
+    runs-on: ubuntu-latest
+    outputs:
+      lowercase_env: ${{ steps.set_env.outputs.lowercase_env }}
+    steps:
+      - id: set_env
+        run: echo "lowercase_env=${{ github.event.inputs.TargetDeploymentEnvironment }}" | tr '[:upper:]' '[:lower:]' >> $GITHUB_OUTPUT
+
+    
+  deploy_resources:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.TargetDeploymentEnvironment }}
+    needs: set_lowercase_env
+    env:
+      RESOURCE_GROUP: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-rg
+      LOG_ANALYTICS_NAME: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-log
+      NAT_GATEWAY_NAME: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-nat
+      VNET_NAME: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-vnet
+      DATA_NAME: psdw${{ needs.set_lowercase_env.outputs.lowercase_env }}stordata #Storage account names are globally unique
+      META_NAME: psdw${{ needs.set_lowercase_env.outputs.lowercase_env }}stormeta #Storage account names are globally unique
+      KEY_VAULT_NAME: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-kv #Key Vault names are globally unique
+      DBX_WKSPC_NAME: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-dbx
+      DBX_CONN_NAME: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-conn-dbx
+      PARAMETERS_PATH: ./lakehouse/environments/${{ needs.set_lowercase_env.outputs.lowercase_env }}
+      ENV: ${{ needs.set_lowercase_env.outputs.lowercase_env }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v1
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets[format('PS_DW_{0}_AZ_CONN', inputs.TargetDeploymentEnvironment)] }} #SP authentication
+
+
+      - name: Deploy Log Analytics Workspace
+        uses: azure/cli@v2
+        with:
+          azcliversion: 2.63.0         
+          inlineScript: |   
+            az account show --output table
+            az deployment group create \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --template-file "./lakehouse/common-config/log_analytics_workspace.bicep" \
+              --parameters "${{ env.PARAMETERS_PATH }}/_parameters.${{ env.ENV }}.json" \
+              --parameters "${{ env.PARAMETERS_PATH }}/_parameters.log_analytics_workspace.json" \
+              --name ${{ env.LOG_ANALYTICS_NAME }} \
+              --mode Incremental
+
+      - name: Deploy Nat Gateway
+        uses: azure/cli@v2
+        with:
+          azcliversion: 2.63.0
+          inlineScript: |
+            az account show --output table
+            az deployment group create \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --template-file "./lakehouse/common-config/nat_gateway.bicep" \
+              --parameters "${{ env.PARAMETERS_PATH }}/_parameters.${{ env.ENV }}.json" \
+              --parameters "${{ env.PARAMETERS_PATH }}/_parameters.nat_gateway.json" \
+              --name ${{ env.NAT_GATEWAY_NAME }} \
+              --mode Incremental
+
+      - name: Deploy Virtual Network
+        uses: azure/cli@v2
+        with:
+          azcliversion: 2.63.0
+          inlineScript: |
+            az account show --output table
+            az deployment group create \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --template-file "./lakehouse/common-config/virtual_network.bicep" \
+              --parameters "${{ env.PARAMETERS_PATH }}/_parameters.${{ env.ENV }}.json" \
+              --parameters "${{ env.PARAMETERS_PATH }}/_parameters.virtual_network.json" \
+              --name ${{ env.VNET_NAME }} \
+              --mode Incremental
+
+      - name: Deploy Data Storage Account
+        uses: azure/cli@v2
+        with:
+          azcliversion: 2.63.0
+          inlineScript: |
+              az account show --output table
+              az deployment group create \
+                --resource-group ${{ env.RESOURCE_GROUP }} \
+                --template-file "./lakehouse/common-config/storage_account_data.bicep" \
+                --parameters "${{ env.PARAMETERS_PATH }}/_parameters.${{ env.ENV }}.json" \
+                --parameters "${{ env.PARAMETERS_PATH }}/_parameters.storage_account_data.json" \
+                --name ${{ env.DATA_NAME }} \
+                --mode Incremental
+    
+      - name: Deploy Meta Storage Account
+        uses: azure/cli@v2
+        with:
+          azcliversion: 2.63.0
+          inlineScript: |
+              az account show --output table
+              az deployment group create \
+                --resource-group ${{ env.RESOURCE_GROUP }} \
+                --template-file "./lakehouse/common-config/storage_account_metastore.bicep" \
+                --parameters "${{ env.PARAMETERS_PATH }}/_parameters.${{ env.ENV }}.json" \
+                --parameters "${{ env.PARAMETERS_PATH }}/_parameters.storage_account_metastore.json" \
+                --name ${{ env.META_NAME }} \
+                --mode Incremental
+      
+      - name: Deploy Key Vault
+        uses: azure/cli@v2
+        with:
+          azcliversion: 2.63.0
+          inlineScript: |
+              az account show --output table
+              az deployment group create \
+                --resource-group ${{ env.RESOURCE_GROUP }} \
+                --template-file "./lakehouse/common-config/key_vault.bicep" \
+                --parameters "${{ env.PARAMETERS_PATH }}/_parameters.${{ env.ENV }}.json" \
+                --parameters "${{ env.PARAMETERS_PATH }}/_parameters.key_vault.json" \
+                --name ${{ env.KEY_VAULT_NAME }} \
+                --mode Incremental
+    
+
+      - name: Deploy Databricks Workspace
+        uses: azure/cli@v2
+        with:
+          azcliversion: 2.63.0
+          inlineScript: |
+            az account show --output table
+            az deployment group create \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --template-file "./lakehouse/common-config/databricks_workspace.bicep" \
+              --parameters "${{ env.PARAMETERS_PATH }}/_parameters.${{ env.ENV }}.json" \
+              --parameters "${{ env.PARAMETERS_PATH }}/_parameters.databricks_workspace.json" \
+              --name ${{ env.DBX_WKSPC_NAME }} \
+              --mode Incremental
+
+      - name: DataBricks Access Connector
+        uses: azure/cli@v2
+        with:
+          azcliversion: 2.63.0
+          inlineScript: |
+            az account show --output table
+            az deployment group create \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --template-file "./lakehouse/common-config/databricks_access_connector.bicep" \
+              --parameters "${{ env.PARAMETERS_PATH }}/_parameters.${{ env.ENV }}.json" \
+              --parameters "${{ env.PARAMETERS_PATH }}/_parameters.databricks_access_connector.json" \
+              --name ${{ env.DBX_CONN_NAME }} \
+              --mode Incremental

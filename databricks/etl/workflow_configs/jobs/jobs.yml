@@ -1,0 +1,60 @@
+resources:
+  jobs:
+    ps_dw_main_workflow:
+      name: ps_dw_main_workflow
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: ps_dw_ifs_load_raw
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.pipeline_ps_dw_ifs_load_raw_dlt.id}
+            full_refresh: true
+        - task_key: ps_dw_pc_load_raw
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.pipeline_ps_dw_pc_load_raw_dlt.id}
+            full_refresh: false
+        - task_key: ps_dw_sf_load_lan
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.pipeline_ps_dw_sf_load_lan_pip.id}
+            full_refresh: false
+        - task_key: ps_dw_sf_load_raw
+          depends_on:
+            - task_key: ps_dw_sf_load_lan
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.pipeline_ps_dw_sf_load_raw_dlt.id}
+            full_refresh: false
+        - task_key: ps_dw_load_curated
+          depends_on:
+            - task_key: ps_dw_sf_load_raw
+            - task_key: ps_dw_pc_load_raw
+            - task_key: ps_dw_ifs_load_raw
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.pipeline_ps_dw_load_curated_dlt.id}
+            full_refresh: false
+      tags: 
+        type: etl
+        branch: ${var.git_branch}
+      queue:
+        enabled: true
+      permissions:
+        - group_name: ACL-PS-PSDW-DATABRICKSADMIN
+          level: CAN_MANAGE
+
+
+    ps_dw_monitor_trigger_and_run:
+      name: ps_dw_monitor_trigger_and_run
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: run_main_workflow
+          run_job_task:
+            job_id: ${resources.jobs.ps_dw_main_workflow.id}
+      trigger: 
+        file_arrival: 
+          url: abfss://landing@psdw${bundle.target}stordata.dfs.core.windows.net/ifs/trigger/
+      tags: 
+        type: etl
+        branch: ${var.git_branch}
+      queue:
+        enabled: true
+      permissions:
+        - group_name: ACL-PS-PSDW-DATABRICKSADMIN
+          level: CAN_MANAGE

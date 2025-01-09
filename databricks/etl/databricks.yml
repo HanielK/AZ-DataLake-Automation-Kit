@@ -1,0 +1,41 @@
+# This is a Databricks asset bundle definition for great_lakes.
+# See https://docs.databricks.com/dev-tools/bundles/index.html for documentation.
+bundle:
+  name: great_lakes_etl
+
+include:
+  - workflow_configs/jobs/*.yml
+  - workflow_configs/pipelines/*.yml
+
+variables:
+  env_catalog:
+    description: The environment-specific name of the Great Lakes catalog.
+    default: <your-catalog-name>
+  git_branch:
+    description: The name of the branch that is deployed.
+    default: <your-branch-name>
+
+targets:
+  # The 'dv' target, used for development purposes.
+  # Whenever a developer deploys using 'dv', they get their own copy.
+  dv:
+    mode: development
+    default: true
+    variables:
+      env_catalog: datawarehouse_dv
+
+  # The 'ua' target, used for user acceptance testing.
+  ua:
+    mode: production
+    variables:
+      env_catalog: datawarehouse_ua
+    workspace:
+      root_path: /Shared/.bundle/${bundle.target}/${bundle.name}
+
+  # The 'pr' target, used for production deployment.
+  pr:
+    mode: production
+    variables:
+      env_catalog: datawarehouse
+    workspace:
+      root_path: /Shared/.bundle/${bundle.target}/${bundle.name}

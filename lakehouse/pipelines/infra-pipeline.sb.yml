@@ -1,0 +1,192 @@
+
+#manual trigger
+trigger:
+  branches:
+    exclude:
+      - '*'
+
+
+pool:
+  name: BuildWSL
+
+
+# variables:
+#   azureServiceConnection: sc-todo-sb-svcpri-dev
+
+parameters:
+- name: environmentName
+  type: string
+  default: 'sb' #Enter the environment name for the deployment
+- name: resourceGroup
+  type: string
+  default: 'sc-todo-sb-rg' #Enter the resource group name
+- name: aclGroupAdmins
+  type: string
+  default: 'ACL-SCS-DATABRICKS-admins' #Enter the ACL group name for the admins,Provided value is a default value
+- name: aclGroupUsers
+  type: string
+  default: 'ACL-SCS-DATABRICKS-admins' #Enter the ACL group name for the users, Provided value is a default value
+#add dry run parameter
+- name: dryRun
+  type: boolean
+  default: false
+
+
+
+variables:
+  - template: variables.sb.yml
+  #add dryRun variable
+  - name: dryRun
+    value: ${{ parameters.dryRun }}
+
+stages:
+- stage: DeploylogAnalyticsWorkspace
+  displayName: 'Deploy Log Analytics Workspace'
+  jobs:
+  - template: templates/deploy-job-template.yml
+    parameters:
+      environmentName: ${{ parameters.environmentName }}
+      resourceType: 'log_analytics_workspace'
+      resourceGroup: ${{ parameters.resourceGroup }}
+
+- stage: DeployNatGateway
+  displayName: 'Deploy Nat Gateway'
+  jobs:
+  - template: templates/deploy-job-template.yml
+    parameters:
+      environmentName: ${{ parameters.environmentName }}
+      resourceType: 'nat_gateway'
+      resourceGroup: ${{ parameters.resourceGroup }}
+  dependsOn: DeploylogAnalyticsWorkspace
+
+- stage: DeployNetwork
+  displayName: 'Deploy Virtual Network'
+  jobs:
+  - template: templates/deploy-job-template.yml
+    parameters:
+      environmentName: ${{ parameters.environmentName }}
+      resourceType: 'virtual_network'
+      resourceGroup: ${{ parameters.resourceGroup }}
+  dependsOn: DeployNatGateway
+
+- stage: DeployStorageData
+  displayName: 'Deploy Data Storage Account'
+  jobs:
+  - template: templates/deploy-job-template.yml
+    parameters:
+      environmentName: ${{ parameters.environmentName }}
+      resourceType: 'storage_account_data'
+      resourceGroup: ${{ parameters.resourceGroup }}
+  dependsOn: DeployNetwork
+
+- stage: DeployStorageMetastore
+  displayName: 'Deploy Meta Storage Account'
+  jobs:
+  - template: templates/deploy-job-template.yml
+    parameters:
+      environmentName: ${{ parameters.environmentName }}
+      resourceType: 'storage_account_metastore'
+      resourceGroup: ${{ parameters.resourceGroup }}
+  dependsOn: DeployStorageData
+
+
+- stage: DeployKeyVault
+  displayName: 'Deploy Key Vault'
+  jobs:
+  - template: templates/deploy-job-template.yml
+    parameters:
+      environmentName: ${{ parameters.environmentName }}
+      resourceType: 'key_vault'
+      resourceGroup: ${{ parameters.resourceGroup }}
+  dependsOn: DeployStorageMetastore
+
+
+- stage: DeployEventHubNamespace
+  displayName: 'Deploy Event Hub Namepsace'
+  jobs:
+  - template: templates/deploy-job-template.yml
+    parameters:
+      environmentName: ${{ parameters.environmentName }}
+      resourceType: 'event_hub'
+      resourceGroup: ${{ parameters.resourceGroup }}
+  dependsOn: DeployKeyVault
+
+- stage: DeployDataFactory
+  displayName: 'Deploy Data Factory'
+  jobs:
+  - template: templates/deploy-job-template.yml
+    parameters:
+      environmentName: ${{ parameters.environmentName }}
+      resourceType: 'data_factory'
+      resourceGroup: ${{ parameters.resourceGroup }}
+  dependsOn: DeployEventHubNamespace
+
+# - stage: DeployEventGridTopic
+#   displayName: 'Deploy Event Grid Topic'
+#   jobs:
+#   - template: templates/deploy-job-template.yml
+#     parameters:
+#       environmentName: ${{ parameters.environmentName }}
+#       resourceType: 'event_grid'
+#       resourceGroup: ${{ parameters.resourceGroup }}
+#   dependsOn: DeployEventHubNamespace
+
+- stage: DeployDatabricksWorkspace
+  displayName: 'Deploy Databricks Workspace'
+  jobs:
+  - template: templates/deploy-job-template.yml
+    parameters:
+      environmentName: ${{ parameters.environmentName }}
+      resourceType: 'databricks_workspace'
+      resourceGroup: ${{ parameters.resourceGroup }}
+  dependsOn: DeployDataFactory
+
+- stage: DeployDataBricksAccessConnector
+  displayName: 'Deploy DataBricks Access Connector'
+  jobs:
+  - template: templates/deploy-job-template.yml
+    parameters:
+      environmentName: ${{ parameters.environmentName }}
+      resourceType: 'databricks_access_connector'
+      resourceGroup: ${{ parameters.resourceGroup }}
+  dependsOn: DeployDatabricksWorkspace
+
+
+- stage: SendEmailAndWaitForApproval
+  displayName: 'Send Email and will wait for the user approval'
+  jobs:
+  - job: SendEmail
+    steps:
+    - task: powershell@2
+      inputs:
+        targetType: 'filePath'
+        filePath: '$(System.DefaultWorkingDirectory)/pipelines/scripts/email/dbxnotification.ps1'
+        arguments: '-resourceGroup ${{ parameters.resourceGroup }} -aclGroupAdmins ${{ parameters.aclGroupAdmins }} -aclGroupUsers ${{ parameters.aclGroupUsers }}'
+
+  - job: WaitForApproval
+    pool: server
+    steps:
+    - task: ManualValidation@0
+      timeoutInMinutes: 1440 # task times out in 1 day
+      inputs:
+        notifyUsers: |
+          x2athuma@southernco.com
+        instructions: |
+          1.)If we are at this stage, the databricks workspace and the connector have been deployed.
+          
+          2.)In order to move forward, the databricks workspace needs to be added to the unity catalog.
+            Please make sure that the workspace is added to the unity catalog before approving this stage.
+
+          3.)Email has been sent to the databricks Admin on adding the workspace to the unity catalog and also the acl group which needs to be added to the enterprise application in Azure Entra ID.
+
+          4.)Please click on the Approve button to proceed with the deployment ONLY AFTER we get the confirmation from the databricks Admin.
+        onTimeout: 'reject'
+        emailSubject: 'Need to Add Databricks Workspace to Unity Catalog'
+        emailBody: |
+          Databricks Admin,
+
+            A new databricks workspace has been created in the resource group ${{ parameters.resourceGroup }}.
+            Please add the workspace to the unity catalog before the deployment can proceed.
+
+          Thanks
+          

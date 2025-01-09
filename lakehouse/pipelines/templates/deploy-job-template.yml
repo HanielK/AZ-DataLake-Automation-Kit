@@ -1,0 +1,48 @@
+parameters:
+- name: environmentName
+  type: string
+- name: resourceType
+  type: string
+- name: resourceGroup
+  type: string
+
+jobs:
+- job: Deploy${{ parameters.resourceType }}
+  variables:
+    - template: ../Variables.${{ parameters.environmentName }}.yml
+  steps:
+  - task: AzureCLI@2
+    inputs:
+      connectedServiceNameARM: ${{ variables.azureServiceConnection }}
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        # Function to add parameters if file exists and is not empty
+        add_params_if_exists() {
+          if [ -s "$1" ]; then
+            echo "--parameters $1"
+          fi
+        }
+
+        # Construct the command dynamically
+        cmd="az deployment group"
+        if [[ "$DRYRUN" == "true" || "$DRYRUN" == "True" || "$DRYRUN" == true ]]; then
+          echo -e "${GREEN}******Dry run enabled******${NC}"
+          cmd+=" what-if"
+        else
+          echo -e "${GREEN}******Dry run disabled******${NC}"
+          cmd+=" create"
+        fi
+
+        cmd+=" --resource-group ${{ parameters.resourceGroup }} --template-file common-config/${{ parameters.resourceType }}.bicep"
+        cmd+=" $(add_params_if_exists "environments/${{ parameters.environmentName }}/_parameters.${{ parameters.environmentName }}.json")"
+        cmd+=" $(add_params_if_exists "environments/${{ parameters.environmentName }}/_parameters.${{ parameters.resourceType }}.json")"
+
+        # Print the command
+        echo "Executing command:"
+        echo "$cmd"
+
+        # Execute the command
+        eval $cmd
+    env:
+      DRYRUN: ${{ variables.dryRun }}
