@@ -18,7 +18,7 @@ module namingModule '../modules/naming/main.bicep' = {
 module factory '../modules/data-factory/factory/main.bicep' = {
   name: 'factoryDeployment'
   params: {
-    name: '${namingModule.outputs.naming_abbrevation}-dfact'
+    name: '${namingModule.outputs.naming_abbrevation}-adf'
     location: deploymentLocation
     managedIdentities: {
       systemAssigned: true
