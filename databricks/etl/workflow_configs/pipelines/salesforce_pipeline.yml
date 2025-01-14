@@ -1,0 +1,44 @@
+resources:
+  pipelines:
+    pipeline_ps_dw_sf_load_lan_pip:
+      name: ps_dw_sf_load_lan_pip
+      channel: PREVIEW
+      ingestion_definition:
+        connection_name: salesforce_connection_pr
+        objects:
+          - table:
+              source_schema: objects
+              source_table: Account
+              destination_catalog: ${var.env_catalog}
+              destination_schema: landing_sf
+          - table:
+              source_schema: objects
+              source_table: User
+              destination_catalog: ${var.env_catalog}
+              destination_schema: landing_sf
+          - table:
+              source_schema: objects
+              source_table: Opportunity
+              destination_catalog: ${var.env_catalog}
+              destination_schema: landing_sf
+          - table:
+              source_schema: objects
+              source_table: OpportunityTeamMember
+              destination_catalog: ${var.env_catalog}
+              destination_schema: landing_sf
+          - table:
+              source_schema: objects
+              source_table: OpportunityLineItem
+              destination_catalog: ${var.env_catalog}
+              destination_schema: landing_sf
+          - table:
+              source_schema: objects
+              source_table: Product2
+              destination_catalog: ${var.env_catalog}
+              destination_schema: landing_sf
+        source_type: SALESFORCE
+      target: landing_sf
+      catalog: ${var.env_catalog}
+      permissions:
+        - group_name: ACL-PS-PSDW-DATABRICKSADMIN
+          level: CAN_MANAGE

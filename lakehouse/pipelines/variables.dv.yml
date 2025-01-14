@@ -1,0 +1,41 @@
+variables:
+#------------------------------------------------------------------
+# Infra Pipeline Configuration
+#------------------------------------------------------------------
+
+#Agent Pool Name  
+  - name: agentPool
+    value: BuildWSL
+  
+#Azure Service Connection Name
+  - name: azureServiceConnection
+    value: ps-dw-dv-svcpri-dev
+
+
+# variables:
+parameters:
+- name: environmentName
+  type: string
+  default: 'dv' #Enter the environment name for the deployment
+- name: resourceGroup
+  type: string
+  default: 'ps-dw-dv-rg' #Enter the resource group name
+- name: templatefile
+  type: string
+  default: './lakehouse/common-config/log_analytics_workspace.bicep' #Enter the path for bicep file
+- name: commonparam
+  type: string
+  default: '/lakehouse/environments/dv/_parameters.dv.json' #Enter the path forcommon paraameters
+- name: resourcename
+- name: logparam
+  type: string
+  default: './lakehouse/environments/dv/_parameters.log_analytics_workspace.json' #Enter he path for log_analytics_workspace paraameters
+- name: resourcename
+  type: string
+  default: 'ps-dw-dv-log' #Enter the resource name
+- name: aclGroupAdmins
+  type: string
+  default: 'ACL-SCS-DATABRICKS-admins' #Enter the ACL group name for the admins,Provided value is a default value
+- name: aclGroupUsers
+  type: string
+  default: 'ACL-SCS-DATABRICKS-admins' #Enter the ACL group name for the users, Provided value is a default value

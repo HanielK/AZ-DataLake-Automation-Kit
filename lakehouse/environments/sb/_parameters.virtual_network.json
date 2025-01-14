@@ -1,0 +1,130 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "vnetAddressPrefix": {
+      "value": "10.251.0.0/20"
+    },
+    "natGatewayName": {
+      "value": "nat"
+    },
+    "vnetSubnets": {
+      "value": [
+        {
+          "name": "sub-default",
+          "addressPrefix": "10.251.0.0/23",
+          "delegations": [],
+          "networkSecurityGroupName": "nsg-default",
+          "natGatewayEnabled": true,
+          "serviceEndpoints": [
+            {
+              "service": "Microsoft.Storage",
+              "locations": [
+                "*"
+              ]
+            },
+            {
+              "service": "Microsoft.KeyVault",
+              "locations": [
+                "*"
+              ]
+            },
+            {
+              "service": "Microsoft.CognitiveServices",
+              "locations": [
+                "*"
+              ]
+            },
+            {
+              "service": "Microsoft.EventHub",
+              "locations": [
+                "*"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "sub-dbx-pub",
+          "addressPrefix": "10.251.2.0/23",
+          "delegations": [
+            {
+              "name": "Microsoft.Databricks/workspaces",
+              "properties": {
+                "serviceName": "Microsoft.Databricks/workspaces"
+              }
+            }
+
+          ],
+          "networkSecurityGroupName": "nsg-dbx",
+          "natGatewayEnabled": true,
+          "serviceEndpoints": [
+            {
+              "service": "Microsoft.Storage",
+              "locations": [
+                "*"
+              ]
+            },
+            {
+              "service": "Microsoft.KeyVault",
+              "locations": [
+                "*"
+              ]
+            },
+            {
+              "service": "Microsoft.CognitiveServices",
+              "locations": [
+                "*"
+              ]
+            },
+            {
+              "service": "Microsoft.EventHub",
+              "locations": [
+                "*"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "sub-dbx-priv",
+          "addressPrefix": "10.251.4.0/22",
+          "delegations": [
+            {
+              "name": "Microsoft.Databricks/workspaces",
+              "properties": {
+                "serviceName": "Microsoft.Databricks/workspaces"
+              }
+            }
+          ],
+          "natGatewayEnabled": true,
+          "networkSecurityGroupName": "nsg-dbx",
+          "serviceEndpoints": [
+            {
+              "service": "Microsoft.Storage",
+              "locations": [
+                "*"
+              ]
+            },
+            {
+              "service": "Microsoft.KeyVault",
+              "locations": [
+                "*"
+              ]
+            },
+            {
+              "service": "Microsoft.CognitiveServices",
+              "locations": [
+                "*"
+              ]
+            },
+            {
+              "service": "Microsoft.EventHub",
+              "locations": [
+                "*"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

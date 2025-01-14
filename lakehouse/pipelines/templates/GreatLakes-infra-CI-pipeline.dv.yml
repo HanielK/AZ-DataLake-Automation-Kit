@@ -1,0 +1,124 @@
+# **************************************************************************
+#  Notes... deploy resources accodrding to the following sequence
+# **************************************************************************
+# =-> Deploy Log Analytics Workspace
+# =-> Deploy Nat Gateway
+# =-> Deploy Virtual Network
+# =-> Deploy Data Storage Account
+# =-> Deploy Meta Storage Account
+# =-> Deploy Key Vault
+# =-> Deploy Event Hub Namepsace
+# =-> Deploy Data Factory
+# =-> Deploy Databricks Workspace
+# =-> Deploy DataBricks Access Connector
+# ---------------------------------------------------------------------------
+resources:
+  repositories:
+  - repository: self
+    type: git
+    ref: refs/heads/tested
+
+stages:
+- stage: Dependancies
+  condition: succeeded()
+  variables:
+    - temaplate: ../variables.${{ parameters.environmentName }}.yml
+
+  jobs:
+    deploy-bicep:
+        Steps:
+        - name: PS_DW_CI_AZ_INFRASTRUCTURE
+        with:
+
+        #Deploy the Bicep Templat using GitHub Actions
+        - name: Deploy BICEP Log Analytics Workspace
+          uses:
+          with:
+            subscriptionid: ${{ secrets.subscriptionId }} #Subscription ID
+            resourceGroup: ../variables.${{ parameters.resourceGroup }}.yml
+            template: './modules/log_analytics_solution/main.bicep' # Path to your Bicep template
+            parameters: './environments/dv/_parameters.log_analytics_workspace.json' # Path to your Bicep paramenter file
+            deploymentName: 'Create: LOG' #Name of the deployment
+            deploymentMode: Incremental
+        
+        #Deploy the Bicep Templat using GitHub Actions
+        - name: Deploy BICEP Nat Gateway
+          uses:
+          with:
+            subscriptionid: ${{ secrets.subscriptionId }} #Subscription ID
+            resourceGroup: ../variables.${{ parameters.resourceGroup }}.yml
+            template: './modules/modules/network/nat-gateway/main.bicep' # Path to your Bicep template
+            parameters: './environments/dv/_parameters.nat_gateway.json' # Path to your Bicep paramenter file
+            deploymentName: 'Create: NAT' #Name of the deployment
+            deploymentMode: Incremental
+        
+        #Deploy the Bicep Templat using GitHub Actions
+        - name: Deploy BICEP Virtual Network
+          uses:
+          with:
+            subscriptionid: ${{ secrets.subscriptionId }} #Subscription ID
+            resourceGroup: ../variables.${{ parameters.resourceGroup }}.yml
+            template: './modules/storage_account/main.bicep' # Path to your Bicep template
+            parameters: './environments/dv/_parameters.virtual_network.json' # Path to your Bicep paramenter file
+            deploymentName: 'Create: VNET' #Name of the deployment
+            deploymentMode: Incremental
+
+        #Deploy the Bicep Templat using GitHub Actions
+        - name: Deploy BICEP Data Storage Account
+          uses:
+          with:
+            subscriptionid: ${{ secrets.subscriptionId }} #Subscription ID
+            resourceGroup: ../variables.${{ parameters.resourceGroup }}.yml
+            template: './modules/log_analytics_solution/main.bicep' # Path to your Bicep template
+            parameters: './environments/dv/_parameters.storage_account_data.json' # Path to your Bicep paramenter file
+            deploymentName: 'Create: DATA' #Name of the deployment
+            deploymentMode: Incremental
+   
+        #Deploy the Bicep Templat using GitHub Actions
+        - name: Deploy BICEP META Storage Account
+          uses:
+          with:
+            subscriptionid: ${{ secrets.subscriptionId }} #Subscription ID
+            resourceGroup: ../variables.${{ parameters.resourceGroup }}.yml
+            template: './modules/storage_account/main.bicep' # Path to your Bicep template
+            parameters: './environments/dv/_parameters.storage_account_metastore.json' # Path to your Bicep paramenter file
+            deploymentName: 'Create: META' #Name of the deployment
+            deploymentMode: Incremental
+
+        #Deploy the Bicep Templat using GitHub Actions
+        - name: Deploy BICEP Key Vault
+          uses:
+          with:
+            subscriptionid: ${{ secrets.subscriptionId }} #Subscription ID
+            resourceGroup: ../variables.${{ parameters.resourceGroup }}.yml
+            template: './modules/key-vault/main.bicep' # Path to your Bicep template
+            parameters: './environments/dv/_parameters.key_vault.json' # Path to your Bicep paramenter file
+            deploymentName: 'Create: KEY' #Name of the deployment
+            deploymentMode: Incremental
+
+       #Deploy the Bicep Templat using GitHub Actions
+        - name: Deploy BICEP Databricks Workspace
+          uses:
+          with:
+            subscriptionid: ${{ secrets.subscriptionId }} #Subscription ID
+            resourceGroup: ../variables.${{ parameters.resourceGroup }}.yml
+            template: './modules/databricks/workspace/main.bicep' # Path to your Bicep template
+            parameters: './environments/dv/_parameters.databricks_workspace.json' # Path to your Bicep paramenter file
+            deploymentName: 'Create: DBX' #Name of the deployment
+            deploymentMode: Incremental
+
+     #Deploy the Bicep Templat using GitHub Actions
+        - name: Deploy BICEP Databricks Workspace Access Connector
+          uses:
+          with:
+            subscriptionid: ${{ secrets.subscriptionId }} #Subscription ID
+            resourceGroup: ../variables.${{ parameters.resourceGroup }}.yml
+            template: './modules/databricks/access-connector/main.bicep' # Path to your Bicep template
+            parameters: './environments/dv/ _parameters.databricks_access_connector.json' # Path to your Bicep paramenter file
+            deploymentName: 'Create: DBXCONN' #Name of the deployment
+            deploymentMode: Incremental
+   
+   # Verify Deployment
+        - name: Verify Deployment
+          run:
+            az deployment group -- show bicep-deployment --resource-group ${{ parameters.resourceGroup }} --name ${{ parameters.deploymentName }} --query properties.outputs --output table

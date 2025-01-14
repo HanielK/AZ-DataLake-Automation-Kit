@@ -1,0 +1,91 @@
+resources:
+  pipelines:
+    pipeline_ps_dw_ifs_load_raw_dlt:
+      name: ps_dw_ifs_load_raw_dlt
+      configuration:
+        env: ${bundle.target}
+        catalog: ${var.env_catalog}
+        bundle.sourcePath: ${workspace.file_path}
+      clusters:
+        - label: default
+          node_type_id: Standard_DS3_v2
+          autoscale:
+            min_workers: 1
+            max_workers: 1
+            mode: ENHANCED
+      libraries:
+        - notebook:
+            path: ../../notebooks/raw/ps_dw_ifs_load_raw_dlt.py
+      target: raw_ifs
+      catalog: ${var.env_catalog}
+      permissions:
+        - group_name: ACL-PS-PSDW-DATABRICKSADMIN
+          level: CAN_MANAGE
+
+    pipeline_ps_dw_sf_load_raw_dlt:
+      name: ps_dw_sf_load_raw_dlt
+      configuration:
+        env: ${bundle.target}
+        catalog: ${var.env_catalog}
+        bundle.sourcePath: ${workspace.file_path}
+      clusters:
+        - label: default
+          node_type_id: Standard_DS3_v2
+          autoscale:
+            min_workers: 1
+            max_workers: 1
+            mode: ENHANCED
+      libraries:
+        - notebook:
+            path: ../../notebooks/raw/ps_dw_sf_load_raw_dlt.py
+      target: raw_sf
+      catalog: ${var.env_catalog}
+      permissions:
+        - group_name: ACL-PS-PSDW-DATABRICKSADMIN
+          level: CAN_MANAGE
+
+    pipeline_ps_dw_pc_load_raw_dlt:
+      name: ps_dw_pc_load_raw_dlt
+      configuration:
+        env: ${bundle.target}
+        catalog: ${var.env_catalog}
+        bundle.sourcePath: ${workspace.file_path}
+      clusters:
+        - label: default
+          node_type_id: Standard_DS3_v2
+          autoscale:
+            min_workers: 1
+            max_workers: 1
+            mode: ENHANCED
+      libraries:
+        - notebook:
+            path: ../../notebooks/raw/ps_dw_pc_load_raw_dlt.py
+      target: raw_pc
+      catalog: ${var.env_catalog}
+      permissions:
+        - group_name: ACL-PS-PSDW-DATABRICKSADMIN
+          level: CAN_MANAGE
+
+    pipeline_ps_dw_load_curated_dlt:
+      name: ps_dw_load_curated_dlt
+      configuration:
+        env: ${bundle.target}
+        catalog: ${var.env_catalog}
+        bundle.sourcePath: ${workspace.file_path}
+      clusters:
+        - label: default
+          node_type_id: Standard_DS3_v2
+          autoscale:
+            min_workers: 1
+            max_workers: 1
+            mode: ENHANCED
+      libraries:
+        - notebook:
+            path: ../../notebooks/curated/ps_dw_load_curated_customer_dlt.py
+        - notebook:
+            path: ../../notebooks/curated/ps_dw_load_curated_commercial_dlt.py
+      target: curated_dw
+      catalog: ${var.env_catalog}
+      permissions:
+        - group_name: ACL-PS-PSDW-DATABRICKSADMIN
+          level: CAN_MANAGE
