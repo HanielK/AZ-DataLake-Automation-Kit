@@ -50,15 +50,15 @@ jobs:
     needs: set_lowercase_env
     env:
       RESOURCE_GROUP: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-rg
-      LOG_ANALYTICS_NAME: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-log
-      NAT_GATEWAY_NAME: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-nat
-      VNET_NAME: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-vnet
-      DATA_NAME: psdw${{ needs.set_lowercase_env.outputs.lowercase_env }}stordata #Storage account names are globally unique
-      META_NAME: psdw${{ needs.set_lowercase_env.outputs.lowercase_env }}stormeta #Storage account names are globally unique
-      KEY_VAULT_NAME: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-kv #Key Vault names are globally unique
-      DATA_FACTORY_NAME: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-adf
-      DBX_WKSPC_NAME: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-dbx
-      DBX_CONN_NAME: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-conn-dbx
+      LOG_ANALYTICS_NAME: pz-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-log
+      NAT_GATEWAY_NAME: pz-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-nat
+      VNET_NAME: pz-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-vnet
+      DATA_NAME: pzdw${{ needs.set_lowercase_env.outputs.lowercase_env }}storedata #Storage account names are globally unique
+      META_NAME: pzdw${{ needs.set_lowercase_env.outputs.lowercase_env }}storemeta #Storage account names are globally unique
+      KEY_VAULT_NAME: pz-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-kv #Key Vault names are globally unique
+      DATA_FACTORY_NAME: pz-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-adf
+      DBX_WKSPC_NAME: pz-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-dbx
+      DBX_CONN_NAME: pz-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-conn-dbx
       PARAMETERS_PATH: ./lakehouse/environments/${{ needs.set_lowercase_env.outputs.lowercase_env }}
       ENV: ${{ needs.set_lowercase_env.outputs.lowercase_env }}
     steps:
