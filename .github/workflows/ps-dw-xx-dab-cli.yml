@@ -368,3 +368,4 @@ jobs:
         working-directory: ./databricks/etl/
       - run: databricks bundle deploy --var="git_branch=${{ env.GIT_BRANCH_NAME }}"
         working-directory: ./databricks/etl/
+
