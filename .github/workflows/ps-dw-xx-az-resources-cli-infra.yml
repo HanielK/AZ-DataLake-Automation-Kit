@@ -56,6 +56,7 @@ jobs:
       DATA_NAME: psdw${{ needs.set_lowercase_env.outputs.lowercase_env }}stordata #Storage account names are globally unique
       META_NAME: psdw${{ needs.set_lowercase_env.outputs.lowercase_env }}stormeta #Storage account names are globally unique
       KEY_VAULT_NAME: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-kv #Key Vault names are globally unique
+      DATA_FACTORY_NAME: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-adf
       DBX_WKSPC_NAME: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-dbx
       DBX_CONN_NAME: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-conn-dbx
       PARAMETERS_PATH: ./lakehouse/environments/${{ needs.set_lowercase_env.outputs.lowercase_env }}
@@ -66,7 +67,7 @@ jobs:
 
       - uses: azure/login@v2
         with:
-          creds: ${{ secrets[format('PS_DW_{0}_AZ_CONN', inputs.TargetDeploymentEnvironment)] }} #SP authentication
+          creds: ${{ secrets[format('PZ_DW_{0}_AZ_CONN', inputs.TargetDeploymentEnvironment)] }} #SP authentication
 
 
       - name: Deploy Log Analytics Workspace
@@ -152,7 +153,20 @@ jobs:
                 --parameters "${{ env.PARAMETERS_PATH }}/_parameters.key_vault.json" \
                 --name ${{ env.KEY_VAULT_NAME }} \
                 --mode Incremental
-    
+      
+      - name: Deploy Data Factory
+        uses: azure/cli@v2
+        with:
+          azcliversion: 2.63.0
+          inlineScript: |
+              az account show --output table
+              az deployment group create \
+                --resource-group ${{ env.RESOURCE_GROUP }} \
+                --template-file "./lakehouse/common-config/data_factory.bicep" \
+                --parameters "${{ env.PARAMETERS_PATH }}/_parameters.${{ env.ENV }}.json" \
+                --parameters "${{ env.PARAMETERS_PATH }}/_parameters.data_factory.json" \
+                --name ${{ env.DATA_FACTORY_NAME }} \
+                --mode Incremental
 
       - name: Deploy Databricks Workspace
         uses: azure/cli@v2
