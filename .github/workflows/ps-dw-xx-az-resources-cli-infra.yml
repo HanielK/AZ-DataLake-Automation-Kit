@@ -67,7 +67,7 @@ jobs:
 
       - uses: azure/login@v2
         with:
-          creds: ${{ secrets[format('PS_DW_{0}_AZ_CONN', inputs.TargetDeploymentEnvironment)] }} #SP authentication
+          creds: ${{ secrets[format('PZ_DW_{0}_AZ_CONN', inputs.TargetDeploymentEnvironment)] }} #SP authentication
 
 
       - name: Deploy Log Analytics Workspace
