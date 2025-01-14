@@ -24,7 +24,7 @@ az deployment group create `
     --template-file "./lakehouse/common-config/storage_account_data.bicep" `
     --parameters "./lakehouse/environments/${env}/_parameters.${env}.json" `
     --parameters "./lakehouse/environments/${env}/_parameters.storage_account_data.json" `
-    --name "psdwdvstordata" `
+    --name "pzdwdvstordata" `
     --mode Incremental `
     --what-if
 
