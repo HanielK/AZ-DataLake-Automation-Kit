@@ -26,7 +26,8 @@ on:
 jobs:
   set_lowercase_env:
     name: "Set lowercase environment variable"
-    runs-on: ps-dw-github-action-hosted-runner-databricks
+    # runs-on: ps-dw-github-action-hosted-runner-databricks #GreatLakes runner
+    runs-on: windows-latest
     outputs:
       lowercase_env: ${{ steps.set_env.outputs.lowercase_env }}
     steps:
@@ -35,7 +36,8 @@ jobs:
 
   get_subscription:
     name: "Get subscription ID"
-    runs-on: ps-dw-github-action-hosted-runner-databricks
+    # runs-on: ps-dw-github-action-hosted-runner-databricks #GreatLakes runner
+    runs-on: windows-latest
     environment: ${{ inputs.TargetDeploymentEnvironment }}
     needs: set_lowercase_env
     if: ${{ inputs.CreateWorkspaceObjects }}
@@ -46,7 +48,7 @@ jobs:
       - uses: actions/checkout@v1
       - uses: azure/login@v2
         with:
-          creds: ${{ secrets[format('PS_DW_{0}_AZ_CONN', inputs.TargetDeploymentEnvironment)] }}
+          creds: ${{ secrets[format('PZ_DW_{0}_AZ_CONN', inputs.TargetDeploymentEnvironment)] }}
       - id: get_subscription_id
         run: |
           SUBSCRIPTION_ID=$(az account show --query id --output tsv)
@@ -54,16 +56,17 @@ jobs:
 
   get_metastore_id:
     name: "Get metastore ID"
-    runs-on: ps-dw-github-action-hosted-runner-databricks
+    # runs-on: ps-dw-github-action-hosted-runner-databricks #GreatLakes runner
+    runs-on: windows-latest
     if: ${{ inputs.CreateWorkspaceObjects }}
     env:
       DATABRICKS_HOST: ${{ vars[format('DBX_{0}_HOST', inputs.TargetDeploymentEnvironment)] }}
       ARM_TENANT_ID: ${{ vars.AZ_TENANT_ID }}
-      ARM_CLIENT_ID: ${{ vars[format('PS_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
-      ARM_CLIENT_SECRET: ${{ secrets[format('PS_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
+      ARM_CLIENT_ID: ${{ vars[format('PZ_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
+      ARM_CLIENT_SECRET: ${{ secrets[format('PZ_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
     outputs:
-      metastore_id: ${{ steps.get_metastore.outputs.metastore_id }}
-    steps:
+      metastore_id: ${{ stePZ.get_metastore.outputs.metastore_id }}
+    stePZ:
       - uses: actions/checkout@v1
       - uses: databricks/setup-cli@v0.234.0
       - id: get_metastore
@@ -73,15 +76,16 @@ jobs:
 
   update_metastore_grants:
     name: "Update metastore permissions"
-    runs-on: ps-dw-github-action-hosted-runner-databricks
+    # runs-on: ps-dw-github-action-hosted-runner-databricks #GreatLakes runner
+    runs-on: windows-latest
     needs: get_metastore_id
     if: ${{ inputs.CreateWorkspaceObjects }}
     env:
       DATABRICKS_HOST: ${{ vars[format('DBX_{0}_HOST', inputs.TargetDeploymentEnvironment)] }}
       ARM_TENANT_ID: ${{ vars.AZ_TENANT_ID }}
-      ARM_CLIENT_ID: ${{ vars[format('PS_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
-      ARM_CLIENT_SECRET: ${{ secrets[format('PS_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
-      PRINCIPAL: ${{ vars[format('PS_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
+      ARM_CLIENT_ID: ${{ vars[format('PZ_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
+      ARM_CLIENT_SECRET: ${{ secrets[format('PZ_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
+      PRINCIPAL: ${{ vars[format('PZ_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
     steps:
       - uses: actions/checkout@v1
       - uses: databricks/setup-cli@v0.234.0
@@ -100,7 +104,8 @@ jobs:
 
   create_storage_credential:
     name: "Create storage credential"
-    runs-on: ps-dw-github-action-hosted-runner-databricks
+    # runs-on: ps-dw-github-action-hosted-runner-databricks #GreatLakes runner
+    runs-on: windows-latest
     environment: ${{ inputs.TargetDeploymentEnvironment }}
     needs:
       - set_lowercase_env
@@ -109,14 +114,14 @@ jobs:
     env:
       DATABRICKS_HOST: ${{ vars[format('DBX_{0}_HOST', inputs.TargetDeploymentEnvironment)] }}
       ARM_TENANT_ID: ${{ vars.AZ_TENANT_ID }}
-      ARM_CLIENT_ID: ${{ vars[format('PS_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
-      ARM_CLIENT_SECRET: ${{ secrets[format('PS_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
-      STORAGE_CREDENTIAL: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-cred-dbx
+      ARM_CLIENT_ID: ${{ vars[format('PZ_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
+      ARM_CLIENT_SECRET: ${{ secrets[format('PZ_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
+      STORAGE_CREDENTIAL: pz-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-cred-dbx
       SUBSCRIPTION_ID: ${{ needs.get_subscription.outputs.subscription_id }}
       RESOURCE_GROUP: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-rg
-      ACCESS_CONNECTOR: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-ac-dbx
+      ACCESS_CONNECTOR: pz-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-ac-dbx
       WORKSPACE_ID: ${{ vars[format('DBX_{0}_WORKSPACE_ID', inputs.TargetDeploymentEnvironment)] }}
-      DATABRICKS_ADMIN_GROUP: "ACL-PS-PSDW-DATABRICKSADMIN"
+      DATABRICKS_ADMIN_GROUP: "ACL-PZ-PSDW-DATABRICKSADMIN"
     steps:
       - uses: actions/checkout@v1
       - uses: databricks/setup-cli@v0.234.0
@@ -157,7 +162,8 @@ jobs:
 
   create_external_location:
     name: "Create external locations"
-    runs-on: ps-dw-github-action-hosted-runner-databricks
+    # runs-on: ps-dw-github-action-hosted-runner-databricks #GreatLakes runner
+    runs-on: windows-latest
     environment: ${{ inputs.TargetDeploymentEnvironment }}
     needs:
       - set_lowercase_env
@@ -167,12 +173,12 @@ jobs:
     env:
       DATABRICKS_HOST: ${{ vars[format('DBX_{0}_HOST', inputs.TargetDeploymentEnvironment)] }}
       ARM_TENANT_ID: ${{ vars.AZ_TENANT_ID }}
-      ARM_CLIENT_ID: ${{ vars[format('PS_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
-      ARM_CLIENT_SECRET: ${{ secrets[format('PS_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
-      STORAGE_CREDENTIAL: ps-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-cred-dbx
+      ARM_CLIENT_ID: ${{ vars[format('PZ_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
+      ARM_CLIENT_SECRET: ${{ secrets[format('PZ_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
+      STORAGE_CREDENTIAL: pz-dw-${{ needs.set_lowercase_env.outputs.lowercase_env }}-cred-dbx
       WORKSPACE_ID: ${{ vars[format('DBX_{0}_WORKSPACE_ID', inputs.TargetDeploymentEnvironment)] }}
-      STORAGE_NAME_BASE: psdw${{ needs.set_lowercase_env.outputs.lowercase_env }}stor
-      DATABRICKS_ADMIN_GROUP: "ACL-PS-PSDW-DATABRICKSADMIN"
+      STORAGE_NAME_BASE: pzdw${{ needs.set_lowercase_env.outputs.lowercase_env }}stor
+      DATABRICKS_ADMIN_GROUP: "ACL-PZ-PSDW-DATABRICKSADMIN"
     steps:
       - uses: actions/checkout@v1
       - uses: databricks/setup-cli@v0.234.0
@@ -220,7 +226,8 @@ jobs:
 
   create_catalog:
     name: "Create catalog"
-    runs-on: ps-dw-github-action-hosted-runner-databricks
+    # runs-on: ps-dw-github-action-hosted-runner-databricks #GreatLakes runner
+    runs-on: windows-latest
     environment: ${{ inputs.TargetDeploymentEnvironment }}
     needs:
       - set_lowercase_env
@@ -229,12 +236,12 @@ jobs:
     env:
       DATABRICKS_HOST: ${{ vars[format('DBX_{0}_HOST', inputs.TargetDeploymentEnvironment)] }}
       ARM_TENANT_ID: ${{ vars.AZ_TENANT_ID }}
-      ARM_CLIENT_ID: ${{ vars[format('PS_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
-      ARM_CLIENT_SECRET: ${{ secrets[format('PS_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
+      ARM_CLIENT_ID: ${{ vars[format('PZ_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
+      ARM_CLIENT_SECRET: ${{ secrets[format('PZ_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
       WORKSPACE_ID: ${{ vars[format('DBX_{0}_WORKSPACE_ID', inputs.TargetDeploymentEnvironment)] }}
-      STORAGE_BASE_NAME: psdw${{ needs.set_lowercase_env.outputs.lowercase_env }}stor
-      DATABRICKS_DEVELOPER_GROUP: "ACL-PS-PSDW-DEV"
-      DATABRICKS_ADMIN_GROUP: "ACL-PS-PSDW-DATABRICKSADMIN"
+      STORAGE_BASE_NAME: pzdw${{ needs.set_lowercase_env.outputs.lowercase_env }}stor
+      DATABRICKS_DEVELOPER_GROUP: "ACL-PZ-PSDW-DEV"
+      DATABRICKS_ADMIN_GROUP: "ACL-PZ-PSDW-DATABRICKSADMIN"
     steps:
       - uses: actions/checkout@v1
       - uses: databricks/setup-cli@v0.234.0
@@ -299,7 +306,8 @@ jobs:
 
   create_schemas:
     name: "Create schemas"
-    runs-on: ps-dw-github-action-hosted-runner-databricks
+    # runs-on: ps-dw-github-action-hosted-runner-databricks #GreatLakes runner
+    runs-on: windows-latest
     environment: ${{ inputs.TargetDeploymentEnvironment }}
     needs:
       - set_lowercase_env
@@ -308,10 +316,10 @@ jobs:
     env:
       DATABRICKS_HOST: ${{ vars[format('DBX_{0}_HOST', inputs.TargetDeploymentEnvironment)] }}
       ARM_TENANT_ID: ${{ vars.AZ_TENANT_ID }}
-      ARM_CLIENT_ID: ${{ vars[format('PS_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
-      ARM_CLIENT_SECRET: ${{ secrets[format('PS_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
-      STORAGE_BASE_NAME: psdw${{ needs.set_lowercase_env.outputs.lowercase_env }}stor
-      DATABRICKS_ADMIN_GROUP: "ACL-PS-PSDW-DATABRICKSADMIN"
+      ARM_CLIENT_ID: ${{ vars[format('PZ_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
+      ARM_CLIENT_SECRET: ${{ secrets[format('PZ_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
+      STORAGE_BASE_NAME: pzdw${{ needs.set_lowercase_env.outputs.lowercase_env }}stor
+      DATABRICKS_ADMIN_GROUP: "ACL-PZ-PSDW-DATABRICKSADMIN"
     steps:
       - uses: actions/checkout@v1
       - uses: databricks/setup-cli@v0.234.0
@@ -347,7 +355,8 @@ jobs:
 
   deploy_etl:
     name: "Deploy ETL Databricks asset bundle"
-    runs-on: ps-dw-github-action-hosted-runner-databricks
+    # runs-on: ps-dw-github-action-hosted-runner-databricks #GreatLakes runner
+    runs-on: windows-latest
     environment: ${{ inputs.TargetDeploymentEnvironment }}
     needs:
       - set_lowercase_env
@@ -356,8 +365,8 @@ jobs:
     env:
       DATABRICKS_HOST: ${{ vars[format('DBX_{0}_HOST', inputs.TargetDeploymentEnvironment)] }}
       ARM_TENANT_ID: ${{ vars.AZ_TENANT_ID }}
-      ARM_CLIENT_ID: ${{ vars[format('PS_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
-      ARM_CLIENT_SECRET: ${{ secrets[format('PS_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
+      ARM_CLIENT_ID: ${{ vars[format('PZ_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
+      ARM_CLIENT_SECRET: ${{ secrets[format('PZ_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
       DATABRICKS_BUNDLE_ENV: ${{ needs.set_lowercase_env.outputs.lowercase_env }}
       GIT_BRANCH_NAME: ${{ github.ref_name }}
     steps:
