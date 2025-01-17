@@ -65,7 +65,7 @@ jobs:
       ARM_CLIENT_ID: ${{ vars[format('PZ_DW_{0}_SVCPRI_DEV_APPLICATION_ID', inputs.TargetDeploymentEnvironment)] }}
       ARM_CLIENT_SECRET: ${{ secrets[format('PZ_DW_{0}_SVCPRI_DEV_SECRET', inputs.TargetDeploymentEnvironment)] }}
     outputs:
-      metastore_id: ${{ stePZ.get_metastore.outputs.metastore_id }}
+      metastore_id: ${{ steps.get_metastore.outputs.metastore_id }}
     steps:
       - uses: actions/checkout@v1
       - uses: databricks/setup-cli@v0.234.0
