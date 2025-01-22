@@ -82,7 +82,6 @@ jobs:
               --parameters "${{ env.PARAMETERS_PATH }}/_parameters.${{ env.ENV }}.json" \
               --parameters "${{ env.PARAMETERS_PATH }}/_parameters.log_analytics_workspace.json" \
               --name ${{ env.LOG_ANALYTICS_NAME }} \
-              --rollback-on-error \
               --mode Incremental
 
       - name: Deploy Nat Gateway
@@ -97,7 +96,6 @@ jobs:
               --parameters "${{ env.PARAMETERS_PATH }}/_parameters.${{ env.ENV }}.json" \
               --parameters "${{ env.PARAMETERS_PATH }}/_parameters.nat_gateway.json" \
               --name ${{ env.NAT_GATEWAY_NAME }} \
-              --rollback-on-error \
               --mode Incremental
 
       - name: Deploy Virtual Network
@@ -112,7 +110,6 @@ jobs:
               --parameters "${{ env.PARAMETERS_PATH }}/_parameters.${{ env.ENV }}.json" \
               --parameters "${{ env.PARAMETERS_PATH }}/_parameters.virtual_network.json" \
               --name ${{ env.VNET_NAME }} \
-              --rollback-on-error \
               --mode Incremental
 
       - name: Deploy Data Storage Account
@@ -127,7 +124,6 @@ jobs:
                 --parameters "${{ env.PARAMETERS_PATH }}/_parameters.${{ env.ENV }}.json" \
                 --parameters "${{ env.PARAMETERS_PATH }}/_parameters.storage_account_data.json" \
                 --name ${{ env.DATA_NAME }} \
-                --rollback-on-error \
                 --mode Incremental
     
       - name: Deploy Meta Storage Account
@@ -142,7 +138,6 @@ jobs:
                 --parameters "${{ env.PARAMETERS_PATH }}/_parameters.${{ env.ENV }}.json" \
                 --parameters "${{ env.PARAMETERS_PATH }}/_parameters.storage_account_metastore.json" \
                 --name ${{ env.META_NAME }} \
-                --rollback-on-error \
                 --mode Incremental
       
       - name: Deploy Key Vault
@@ -157,7 +152,6 @@ jobs:
                 --parameters "${{ env.PARAMETERS_PATH }}/_parameters.${{ env.ENV }}.json" \
                 --parameters "${{ env.PARAMETERS_PATH }}/_parameters.key_vault.json" \
                 --name ${{ env.KEY_VAULT_NAME }} \
-                --rollback-on-error \
                 --mode Incremental
       
       - name: Deploy Data Factory
@@ -172,7 +166,6 @@ jobs:
                 --parameters "${{ env.PARAMETERS_PATH }}/_parameters.${{ env.ENV }}.json" \
                 --parameters "${{ env.PARAMETERS_PATH }}/_parameters.data_factory.json" \
                 --name ${{ env.DATA_FACTORY_NAME }} \
-                --rollback-on-error \
                 --mode Incremental
 
       - name: Deploy Databricks Workspace
@@ -187,7 +180,6 @@ jobs:
               --parameters "${{ env.PARAMETERS_PATH }}/_parameters.${{ env.ENV }}.json" \
               --parameters "${{ env.PARAMETERS_PATH }}/_parameters.databricks_workspace.json" \
               --name ${{ env.DBX_WKSPC_NAME }} \
-              --rollback-on-error \
               --mode Incremental
 
       - name: DataBricks Access Connector
@@ -202,5 +194,4 @@ jobs:
               --parameters "${{ env.PARAMETERS_PATH }}/_parameters.${{ env.ENV }}.json" \
               --parameters "${{ env.PARAMETERS_PATH }}/_parameters.databricks_access_connector.json" \
               --name ${{ env.DBX_CONN_NAME }} \
-              --rollback-on-error \
               --mode Incremental
