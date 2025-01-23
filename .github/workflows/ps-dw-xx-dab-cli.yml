@@ -27,7 +27,7 @@ jobs:
   set_lowercase_env:
     name: "Set lowercase environment variable"
     # runs-on: ps-dw-github-action-hosted-runner-databricks #GreatLakes runner
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     outputs:
       lowercase_env: ${{ steps.set_env.outputs.lowercase_env }}
     steps:
@@ -37,7 +37,7 @@ jobs:
   get_subscription:
     name: "Get subscription ID"
     # runs-on: ps-dw-github-action-hosted-runner-databricks #GreatLakes runner
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     environment: ${{ inputs.TargetDeploymentEnvironment }}
     needs: set_lowercase_env
     if: ${{ inputs.CreateWorkspaceObjects }}
@@ -48,7 +48,7 @@ jobs:
       - uses: actions/checkout@v1
       - uses: azure/login@v2
         with:
-          creds: ${{ secrets[format('PZ_DW_{0}_AZ_CONN', inputs.TargetDeploymentEnvironment)] }}
+          creds: ${{ secrets[format('PZ_DW_{0}_AZ_CONN', inputs.TargetDeploymentEnvironment)] }} #SP authentication
       - id: get_subscription_id
         run: |
           SUBSCRIPTION_ID=$(az account show --query id --output tsv)
@@ -57,7 +57,7 @@ jobs:
   get_metastore_id:
     name: "Get metastore ID"
     # runs-on: ps-dw-github-action-hosted-runner-databricks #GreatLakes runner
-    runs-on: windows-latest #Git hosted runner
+    runs-on: ubuntu-latest #Git hosted runner
     if: ${{ inputs.CreateWorkspaceObjects }}
     env:
       DATABRICKS_HOST: ${{ vars[format('DBX_{0}_HOST', inputs.TargetDeploymentEnvironment)] }}
@@ -77,7 +77,7 @@ jobs:
   update_metastore_grants:
     name: "Update metastore permissions"
     # runs-on: ps-dw-github-action-hosted-runner-databricks #GreatLakes runner
-    runs-on: windows-latest  #Git hosted runner
+    runs-on: ubuntu-latest  #Git hosted runner
     needs: get_metastore_id
     if: ${{ inputs.CreateWorkspaceObjects }}
     env:
@@ -105,7 +105,7 @@ jobs:
   create_storage_credential:
     name: "Create storage credential"
     # runs-on: ps-dw-github-action-hosted-runner-databricks #GreatLakes runner
-    runs-on: windows-latest #Git hosted runner
+    runs-on: ubuntu-latest #Git hosted runner
     environment: ${{ inputs.TargetDeploymentEnvironment }}
     needs:
       - set_lowercase_env
@@ -163,7 +163,7 @@ jobs:
   create_external_location:
     name: "Create external locations"
     # runs-on: ps-dw-github-action-hosted-runner-databricks #GreatLakes runner
-    runs-on: windows-latest #Git hosted runner
+    runs-on: ubuntu-latest #Git hosted runner
     environment: ${{ inputs.TargetDeploymentEnvironment }}
     needs:
       - set_lowercase_env
@@ -227,7 +227,7 @@ jobs:
   create_catalog:
     name: "Create catalog"
     # runs-on: ps-dw-github-action-hosted-runner-databricks #GreatLakes runner
-    runs-on: windows-latest #Git hosted runner
+    runs-on: ubuntu-latest #Git hosted runner
     environment: ${{ inputs.TargetDeploymentEnvironment }}
     needs:
       - set_lowercase_env
@@ -307,7 +307,7 @@ jobs:
   create_schemas:
     name: "Create schemas"
     # runs-on: ps-dw-github-action-hosted-runner-databricks #GreatLakes runner
-    runs-on: windows-latest #Git hosted runner
+    runs-on: ubuntu-latest #Git hosted runner
     environment: ${{ inputs.TargetDeploymentEnvironment }}
     needs:
       - set_lowercase_env
@@ -356,7 +356,7 @@ jobs:
   deploy_etl:
     name: "Deploy ETL Databricks asset bundle"
     # runs-on: ps-dw-github-action-hosted-runner-databricks #GreatLakes runner
-    runs-on: windows-latest #Git hosted runner
+    runs-on: ubuntu-latest #Git hosted runner
     environment: ${{ inputs.TargetDeploymentEnvironment }}
     needs:
       - set_lowercase_env
